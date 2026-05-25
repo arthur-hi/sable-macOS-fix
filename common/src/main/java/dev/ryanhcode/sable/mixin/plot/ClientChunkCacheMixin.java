@@ -79,6 +79,8 @@ public abstract class ClientChunkCacheMixin implements DebugChunkProviderAttachm
             } else {
                 cir.setReturnValue(this.emptyChunk);
             }
+        } else if (Math.abs(x) > 3000000 || Math.abs(z) > 3000000) {
+            cir.setReturnValue(this.emptyChunk);
         }
     }
 
