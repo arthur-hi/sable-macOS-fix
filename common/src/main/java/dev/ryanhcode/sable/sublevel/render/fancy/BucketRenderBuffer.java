@@ -22,6 +22,8 @@ public class BucketRenderBuffer implements NativeResource {
     private int buffer;
     private boolean dirty;
 
+    private static final boolean IS_MAC = System.getProperty("os.name").toLowerCase().contains("mac");
+
     private int size;
     private int maxSize;
     private BitSet closedBuckets;
@@ -41,7 +43,19 @@ public class BucketRenderBuffer implements NativeResource {
         RenderSystem.glBindBuffer(GL_COPY_READ_BUFFER, this.buffer);
         RenderSystem.glBindBuffer(GL_COPY_WRITE_BUFFER, copyDest);
         glBufferData(GL_COPY_WRITE_BUFFER, (long) newSize * QUAD_SIZE, GL_STREAM_DRAW);
-        glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, (long) this.maxSize * QUAD_SIZE);
+        if (IS_MAC) {
+            final int sizeToCopy = this.maxSize * QUAD_SIZE;
+            final java.nio.ByteBuffer temp = MemoryUtil.memAlloc(sizeToCopy);
+            try {
+                glGetBufferSubData(GL_COPY_READ_BUFFER, 0, temp);
+                temp.rewind();
+                glBufferSubData(GL_COPY_WRITE_BUFFER, 0, temp);
+            } finally {
+                MemoryUtil.memFree(temp);
+            }
+        } else {
+            glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, (long) this.maxSize * QUAD_SIZE);
+        }
         RenderSystem.glDeleteBuffers(this.buffer);
         this.buffer = copyDest;
         this.maxSize = newSize;
