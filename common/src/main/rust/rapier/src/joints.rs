@@ -230,6 +230,16 @@ pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_rem
     let scene = get_scene_mut_ref(scene_id);
     if let Some(joint) = scene.joint_set.joints.remove(&joint_id) {
         scene.impulse_joint_set.remove(joint.handle, true);
+        if let Some(id_a) = joint.id_a {
+            if let Some(&rb_a) = scene.rigid_bodies.get(&id_a) {
+                scene.island_manager.wake_up(&mut scene.rigid_body_set, rb_a, true);
+            }
+        }
+        if let Some(id_b) = joint.id_b {
+            if let Some(&rb_b) = scene.rigid_bodies.get(&id_b) {
+                scene.island_manager.wake_up(&mut scene.rigid_body_set, rb_b, true);
+            }
+        }
     }
 }
 
@@ -282,6 +292,12 @@ pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_add
     let handle = scene
         .impulse_joint_set
         .insert(rb_a, rb_b, revolute.build(), true);
+    if id_a != -1 {
+        scene.island_manager.wake_up(&mut scene.rigid_body_set, rb_a, true);
+    }
+    if id_b != -1 {
+        scene.island_manager.wake_up(&mut scene.rigid_body_set, rb_b, true);
+    }
 
     let (index, generation) = handle.0.into_raw_parts();
     let handle_long: SableJointHandle = index as jlong | (generation as jlong) << 32;
@@ -371,6 +387,12 @@ pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_add
     let handle = scene
         .impulse_joint_set
         .insert(rb_a, rb_b, revolute.build(), true);
+    if id_a != -1 {
+        scene.island_manager.wake_up(&mut scene.rigid_body_set, rb_a, true);
+    }
+    if id_b != -1 {
+        scene.island_manager.wake_up(&mut scene.rigid_body_set, rb_b, true);
+    }
 
     let (index, generation) = handle.0.into_raw_parts();
     let handle_long: SableJointHandle = index as jlong | (generation as jlong) << 32;
@@ -457,6 +479,12 @@ pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_add
     let handle = scene
         .impulse_joint_set
         .insert(rb_a, rb_b, joint.build(), true);
+    if id_a != -1 {
+        scene.island_manager.wake_up(&mut scene.rigid_body_set, rb_a, true);
+    }
+    if id_b != -1 {
+        scene.island_manager.wake_up(&mut scene.rigid_body_set, rb_b, true);
+    }
 
     let (index, generation) = handle.0.into_raw_parts();
     let handle_long: SableJointHandle = index as jlong | (generation as jlong) << 32;
@@ -558,6 +586,12 @@ pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_add
     let handle = scene
         .impulse_joint_set
         .insert(rb_a, rb_b, joint.build(), true);
+    if id_a != -1 {
+        scene.island_manager.wake_up(&mut scene.rigid_body_set, rb_a, true);
+    }
+    if id_b != -1 {
+        scene.island_manager.wake_up(&mut scene.rigid_body_set, rb_b, true);
+    }
 
     let (index, generation) = handle.0.into_raw_parts();
     let handle_long: SableJointHandle = index as jlong | (generation as jlong) << 32;

@@ -801,12 +801,15 @@ pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_add
                 // println!("receving non global physics chunk");
                 // println!("object id {:?}", object_id);
                 if object_id != -1 {
+                    let id = object_id as LevelColliderID;
                     let body = scene
                         .level_colliders
-                        .get_mut(&(object_id as LevelColliderID))
+                        .get_mut(&id)
                         .unwrap();
 
                     body.insert_chunk(chunk, x, y, z);
+                    let handle = scene.rigid_bodies[&id];
+                    scene.island_manager.wake_up(&mut scene.rigid_body_set, handle, true);
                     // println!("inserting blocks to octree");
                     // println!("post octree {:?}", body.octree);
                     // println!("post min {:?}", body.local_bounds_min);
@@ -992,12 +995,19 @@ pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_cha
                 chunk.set_block(x & 15, y & 15, z & 15, block_state);
 
                 let mut any = false;
-                for (_, sable_body) in scene.level_colliders.iter_mut() {
+                let mut modified_id = None;
+                for (&id, sable_body) in scene.level_colliders.iter_mut() {
                     if sable_body.contains(x, y, z) {
                         sable_body.insert_block(x, y, z, &block_state, true);
+                        modified_id = Some(id);
                         any = true;
                         break;
                     }
+                }
+
+                if let Some(id) = modified_id {
+                    let handle = scene.rigid_bodies[&id];
+                    scene.island_manager.wake_up(&mut scene.rigid_body_set, handle, true);
                 }
 
                 if !any {
@@ -1105,20 +1115,20 @@ pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_set
     );
 
     let scene = get_scene_mut_ref(scene_id);
-
-    let rb = &mut scene.rigid_body_set[scene.rigid_bodies[&(id as LevelColliderID)]];
-
-    rb.set_additional_mass_properties(
-        MassProperties::with_inertia_matrix(Vector::ZERO, mass as Real, inertia_tensor.into()),
-        true,
-    );
+    let handle = scene.rigid_bodies[&(id as LevelColliderID)];
+    {
+        let rb = &mut scene.rigid_body_set[handle];
+        rb.set_additional_mass_properties(
+            MassProperties::with_inertia_matrix(Vector::ZERO, mass as Real, inertia_tensor.into()),
+            true,
+        );
+    }
+    scene.island_manager.wake_up(&mut scene.rigid_body_set, handle, true);
 }
 
 /// Teleports the object to the given position.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_teleportObject<
-    'local,
->(
+pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_teleportObject<'local>(
     _env: JNIEnv<'local>,
     _class: JClass<'local>,
     scene_id: jint,
@@ -1132,12 +1142,14 @@ pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_tel
     r: jdouble,
 ) {
     let scene = get_scene_mut_ref(scene_id);
-    let rb = &mut scene.rigid_body_set[scene.rigid_bodies[&(id as LevelColliderID)]];
+    let handle = scene.rigid_bodies[&(id as LevelColliderID)];
+    let rb = &mut scene.rigid_body_set[handle];
 
     let mut pose = *rb.position();
     pose.translation = Vector::new(x as Real, y as Real, z as Real);
     pose.rotation = Quat::from_xyzw(i as Real, j as Real, k as Real, r as Real);
     rb.set_position(pose, true);
+    scene.island_manager.wake_up(&mut scene.rigid_body_set, handle, true);
 }
 
 /// Wakes up an object.
@@ -1172,20 +1184,26 @@ pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_add
     wake_up: jboolean,
 ) {
     let scene = get_scene_mut_ref(scene_id);
-    let rb = get_rigid_body_mut(scene, id as LevelColliderID);
+    let handle = scene.rigid_bodies[&(id as LevelColliderID)];
+    {
+        let rb = &mut scene.rigid_body_set[handle];
 
-    if wake_up == 0 && rb.is_sleeping() {
-        return;
+        if wake_up == 0 && rb.is_sleeping() {
+            return;
+        }
+
+        rb.set_linvel(
+            rb.linvel() + Vector::new(linear_x as Real, linear_y as Real, linear_z as Real),
+            wake_up > 0,
+        );
+        rb.set_angvel(
+            rb.angvel() + Vector::new(angular_x as Real, angular_y as Real, angular_z as Real),
+            wake_up > 0,
+        );
     }
-
-    rb.set_linvel(
-        rb.linvel() + Vector::new(linear_x as Real, linear_y as Real, linear_z as Real),
-        wake_up > 0,
-    );
-    rb.set_angvel(
-        rb.angvel() + Vector::new(angular_x as Real, angular_y as Real, angular_z as Real),
-        wake_up > 0,
-    );
+    if wake_up > 0 {
+        scene.island_manager.wake_up(&mut scene.rigid_body_set, handle, true);
+    }
 }
 
 /// Clears & queries all collisions
@@ -1272,24 +1290,29 @@ pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_app
             panic!("No scene with given ID!");
         };
 
-        let body = scene.rigid_bodies.get(&(id as LevelColliderID)).unwrap();
-        let rb = &mut scene.rigid_body_set[*body];
+        let body = *scene.rigid_bodies.get(&(id as LevelColliderID)).unwrap();
+        {
+            let rb = &mut scene.rigid_body_set[body];
 
-        if wake_up == 0 && rb.is_sleeping() {
-            return;
+            if wake_up == 0 && rb.is_sleeping() {
+                return;
+            }
+
+            let force: Vector = rb
+                .rotation()
+                .mul_vec3(Vector::new(fx as Real, fy as Real, fz as Real));
+            let force_pos = rb
+                .position()
+                .transform_point(Vector::new(x as Real, y as Real, z as Real));
+
+            rb.apply_impulse(force, wake_up > 0);
+
+            let torque_impulse = (force_pos - rb.position().translation).cross(force);
+            rb.apply_torque_impulse(torque_impulse, wake_up > 0);
         }
-
-        let force: Vector = rb
-            .rotation()
-            .mul_vec3(Vector::new(fx as Real, fy as Real, fz as Real));
-        let force_pos = rb
-            .position()
-            .transform_point(Vector::new(x as Real, y as Real, z as Real));
-
-        rb.apply_impulse(force, wake_up > 0);
-
-        let torque_impulse = (force_pos - rb.position().translation).cross(force);
-        rb.apply_torque_impulse(torque_impulse, wake_up > 0);
+        if wake_up > 0 {
+            scene.island_manager.wake_up(&mut scene.rigid_body_set, body, true);
+        }
     }
 }
 
@@ -1319,22 +1342,27 @@ pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_app
             panic!("No scene with given ID!");
         };
 
-        let body = scene.rigid_bodies.get(&(id as LevelColliderID)).unwrap();
-        let rb = &mut scene.rigid_body_set[*body];
+        let body = *scene.rigid_bodies.get(&(id as LevelColliderID)).unwrap();
+        {
+            let rb = &mut scene.rigid_body_set[body];
 
-        if wake_up == 0 && rb.is_sleeping() {
-            return;
+            if wake_up == 0 && rb.is_sleeping() {
+                return;
+            }
+
+            let force: Vector = rb
+                .rotation()
+                .mul_vec3(Vector::new(fx as Real, fy as Real, fz as Real));
+            rb.apply_impulse(force, wake_up > 0);
+
+            let torque: Vector = rb
+                .rotation()
+                .mul_vec3(Vector::new(tx as Real, ty as Real, tz as Real));
+            rb.apply_torque_impulse(torque, wake_up > 0);
         }
-
-        let force: Vector = rb
-            .rotation()
-            .mul_vec3(Vector::new(fx as Real, fy as Real, fz as Real));
-        rb.apply_impulse(force, wake_up > 0);
-
-        let torque: Vector = rb
-            .rotation()
-            .mul_vec3(Vector::new(tx as Real, ty as Real, tz as Real));
-        rb.apply_torque_impulse(torque, wake_up > 0);
+        if wake_up > 0 {
+            scene.island_manager.wake_up(&mut scene.rigid_body_set, body, true);
+        }
     }
 }
 

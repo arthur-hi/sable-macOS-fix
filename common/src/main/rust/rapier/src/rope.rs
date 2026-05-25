@@ -419,7 +419,7 @@ pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_wak
     let strand = scene.rope_map.ropes.get_mut(&(rope_id as usize)).unwrap();
 
     for point in &strand.points {
-        scene.rigid_body_set.get_mut(*point).unwrap().wake_up(true);
+        scene.island_manager.wake_up(&mut scene.rigid_body_set, *point, true);
     }
 }
 
@@ -467,6 +467,8 @@ pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_set
     let joint = scene
         .impulse_joint_set
         .insert(sub_level_body, *rope_body, joint.build(), true);
+    scene.island_manager.wake_up(&mut scene.rigid_body_set, sub_level_body, true);
+    scene.island_manager.wake_up(&mut scene.rigid_body_set, *rope_body, true);
 
     if if end > 0 {
         &strand.end_attachment

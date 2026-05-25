@@ -131,36 +131,37 @@ pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_set
         pose_arr[6] as Real,
     );
 
-    let scene = get_scene_mut_ref(scene_id);
-    let info = get_kinematic_collider_info(scene, id);
-    let collider_handle = info.collider;
-
-    let scene = get_scene_mut_ref(scene_id);
-    let collider = scene.collider_set.get_mut(collider_handle);
-
-    if collider.is_none() {
-        return;
-    }
+    let collider_handle = {
+        let scene = get_scene_mut_ref(scene_id);
+        get_kinematic_collider_info(scene, id).collider
+    };
 
     let isometry = Pose3 {
         rotation: quat,
         translation: Vector::new(translation.x, translation.y, translation.z),
     };
 
-    // if (info.static_mount.is_some()) {
-    //     let body = scene.rigid_body_set.get_mut(info.static_mount.unwrap()).unwrap();
-    //
-    //     if (info.fake_velocities.is_none()) {
-    //         body.set_position(isometry, true);
-    //     }
-    //
-    //     // body.set_next_kinematic_position(isometry);
-    //     scene.impulse_joint_set.remove_joints_attached_to_rigid_body(info.static_mount.unwrap());
-    // } else {
-    let collider = collider.unwrap();
+    let parent = {
+        let scene = get_scene_mut_ref(scene_id);
+        let collider = scene.collider_set.get_mut(collider_handle);
 
-    collider.set_position_wrt_parent(isometry);
-    // }
+        if collider.is_none() {
+            return;
+        }
+
+        let collider = collider.unwrap();
+        let parent = collider.parent();
+        collider.set_position_wrt_parent(isometry);
+        parent
+    };
+
+    if let Some(parent_handle) = parent {
+        let scene = get_scene_mut_ref(scene_id);
+        scene.island_manager.wake_up(&mut scene.rigid_body_set, parent_handle, true);
+    }
+
+    let scene = get_scene_mut_ref(scene_id);
+    let info = get_kinematic_collider_info(scene, id);
 
     info.center_of_mass = Some(Vector3::new(
         center_of_mass_arr[0],
