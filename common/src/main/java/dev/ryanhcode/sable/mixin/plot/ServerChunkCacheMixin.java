@@ -65,7 +65,7 @@ public class ServerChunkCacheMixin {
             final LevelChunk chunk = container.getChunk(new ChunkPos(x, z));
 
             cir.setReturnValue(chunk);
-        } else if (Math.abs(x) > 3000000 || Math.abs(z) > 3000000) {
+        } else if (Math.abs(x) > 1000000 || Math.abs(z) > 1000000) {
             cir.setReturnValue(this.sable$emptyChunk);
         }
     }
@@ -83,7 +83,7 @@ public class ServerChunkCacheMixin {
             } else {
                 cir.setReturnValue(CompletableFuture.completedFuture(ChunkResult.of(this.sable$emptyChunk)));
             }
-        } else if (Math.abs(x) > 3000000 || Math.abs(z) > 3000000) {
+        } else if (Math.abs(x) > 1000000 || Math.abs(z) > 1000000) {
             cir.setReturnValue(CompletableFuture.completedFuture(ChunkResult.of(this.sable$emptyChunk)));
         }
     }
@@ -95,7 +95,7 @@ public class ServerChunkCacheMixin {
             final ChunkAccess chunk = container.getChunk(new ChunkPos(x, z));
 
             cir.setReturnValue(chunk != null);
-        } else if (Math.abs(x) > 3000000 || Math.abs(z) > 3000000) {
+        } else if (Math.abs(x) > 1000000 || Math.abs(z) > 1000000) {
             cir.setReturnValue(false);
         }
     }
@@ -108,7 +108,7 @@ public class ServerChunkCacheMixin {
             final LevelChunk chunk = container.getChunk(new ChunkPos(x, z));
 
             cir.setReturnValue(chunk);
-        } else if (Math.abs(x) > 3000000 || Math.abs(z) > 3000000) {
+        } else if (Math.abs(x) > 1000000 || Math.abs(z) > 1000000) {
             cir.setReturnValue(this.sable$emptyChunk);
         }
     }
@@ -121,7 +121,7 @@ public class ServerChunkCacheMixin {
             final LevelChunk chunk = container.getChunk(chunkPos);
 
             cir.setReturnValue(chunk != null);
-        } else if (Math.abs(ChunkPos.getX(pos)) > 3000000 || Math.abs(ChunkPos.getZ(pos)) > 3000000) {
+        } else if (Math.abs(ChunkPos.getX(pos)) > 1000000 || Math.abs(ChunkPos.getZ(pos)) > 1000000) {
             cir.setReturnValue(false);
         }
     }
@@ -138,7 +138,7 @@ public class ServerChunkCacheMixin {
             }
 
             ci.cancel();
-        } else if (Math.abs(ChunkPos.getX(pos)) > 3000000 || Math.abs(ChunkPos.getZ(pos)) > 3000000) {
+        } else if (Math.abs(ChunkPos.getX(pos)) > 1000000 || Math.abs(ChunkPos.getZ(pos)) > 1000000) {
             ci.cancel();
         }
     }
@@ -171,7 +171,7 @@ public class ServerChunkCacheMixin {
             final PlotChunkHolder holder = container.getChunkHolder(chunkPos);
 
             cir.setReturnValue(holder);
-        } else if (Math.abs(x) > 3000000 || Math.abs(z) > 3000000) {
+        } else if (Math.abs(x) > 1000000 || Math.abs(z) > 1000000) {
             cir.setReturnValue(null);
         }
     }
@@ -181,7 +181,7 @@ public class ServerChunkCacheMixin {
         final SubLevelContainer container = this.sable$getPlotContainer();
         if (container.inBounds(pos)) {
             ci.cancel();
-        } else if (Math.abs(pos.x) > 3000000 || Math.abs(pos.z) > 3000000) {
+        } else if (Math.abs(pos.x) > 1000000 || Math.abs(pos.z) > 1000000) {
             ci.cancel();
         }
     }
